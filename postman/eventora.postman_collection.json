@@ -1,0 +1,301 @@
+{
+  "info": {
+    "name": "Eventora API Tests",
+    "description": "Comprehensive Postman test collection for Eventora Multi-Tenant Event & Ticket Reservation System covering all 23 required test scenarios.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Successful Registration",
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Test Attendee\",\n  \"email\": \"test.attendee@example.com\",\n  \"password\": \"SecurePass123!\",\n  \"role\": \"ATTENDEE\"\n}"
+        },
+        "url": "{{baseUrl}}/api/v1/auth/register"
+      }
+    },
+    {
+      "name": "2. Duplicate Email Registration",
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Duplicate User\",\n  \"email\": \"test.attendee@example.com\",\n  \"password\": \"SecurePass123!\"\n}"
+        },
+        "url": "{{baseUrl}}/api/v1/auth/register"
+      }
+    },
+    {
+      "name": "3. Successful Login",
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"test.attendee@example.com\",\n  \"password\": \"SecurePass123!\"\n}"
+        },
+        "url": "{{baseUrl}}/api/v1/auth/login"
+      }
+    },
+    {
+      "name": "4. Invalid Password Login",
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"test.attendee@example.com\",\n  \"password\": \"WrongPassword!\"\n}"
+        },
+        "url": "{{baseUrl}}/api/v1/auth/login"
+      }
+    },
+    {
+      "name": "5. Unauthorized Organizer Endpoint (Attendee Token)",
+      "request": {
+        "method": "GET",
+        "header": [{"key": "Authorization", "value": "Bearer {{attendeeToken}}"}],
+        "url": "{{baseUrl}}/api/v1/organizer/analytics/overview"
+      }
+    },
+    {
+      "name": "6. Organizer Accessing Another Organizer's Event",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {"key": "Authorization", "value": "Bearer {{organizer2Token}}"},
+          {"key": "Content-Type", "value": "application/json"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"title\": \"Hacked Title\"}"
+        },
+        "url": "{{baseUrl}}/api/v1/organizer/events/{{organizer1EventId}}"
+      }
+    },
+    {
+      "name": "7. Successful Event Creation",
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Authorization", "value": "Bearer {{organizerToken}}"},
+          {"key": "Content-Type", "value": "application/json"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Cloud Native Summit 2026\",\n  \"description\": \"Premier cloud native architecture conference.\",\n  \"category\": \"Tech & Innovation\",\n  \"startAt\": \"2026-11-20T09:00:00Z\",\n  \"endAt\": \"2026-11-20T18:00:00Z\",\n  \"salesCutoffAt\": \"2026-11-19T23:59:59Z\",\n  \"venueName\": \"Civic Convention Center\",\n  \"city\": \"San Francisco\",\n  \"capacity\": 1500\n}"
+        },
+        "url": "{{baseUrl}}/api/v1/organizer/events"
+      }
+    },
+    {
+      "name": "8. Invalid Event Dates (End before Start)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Authorization", "value": "Bearer {{organizerToken}}"},
+          {"key": "Content-Type", "value": "application/json"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Invalid Event Dates\",\n  \"startAt\": \"2026-11-20T18:00:00Z\",\n  \"endAt\": \"2026-11-20T09:00:00Z\"\n}"
+        },
+        "url": "{{baseUrl}}/api/v1/organizer/events"
+      }
+    },
+    {
+      "name": "9. Successful Reservation (10-min Hold)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Authorization", "value": "Bearer {{attendeeToken}}"},
+          {"key": "Content-Type", "value": "application/json"},
+          {"key": "Idempotency-Key", "value": "idem-res-001"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"items\": [{\"ticketTierId\": \"{{validTierId}}\", \"quantity\": 2}]\n}"
+        },
+        "url": "{{baseUrl}}/api/v1/reservations"
+      }
+    },
+    {
+      "name": "10. Insufficient Ticket Inventory",
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Authorization", "value": "Bearer {{attendeeToken}}"},
+          {"key": "Content-Type", "value": "application/json"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"items\": [{\"ticketTierId\": \"{{soldOutTierId}}\", \"quantity\": 10}]\n}"
+        },
+        "url": "{{baseUrl}}/api/v1/reservations"
+      }
+    },
+    {
+      "name": "11. Reservation Expiration Check",
+      "request": {
+        "method": "GET",
+        "header": [{"key": "Authorization", "value": "Bearer {{attendeeToken}}"}],
+        "url": "{{baseUrl}}/api/v1/reservations/{{expiredReservationId}}"
+      }
+    },
+    {
+      "name": "12. Duplicate Idempotency Key Reservation",
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Authorization", "value": "Bearer {{attendeeToken}}"},
+          {"key": "Content-Type", "value": "application/json"},
+          {"key": "Idempotency-Key", "value": "idem-res-001"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"items\": [{\"ticketTierId\": \"{{validTierId}}\", \"quantity\": 2}]\n}"
+        },
+        "url": "{{baseUrl}}/api/v1/reservations"
+      }
+    },
+    {
+      "name": "13. Successful Mock Payment",
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Authorization", "value": "Bearer {{attendeeToken}}"},
+          {"key": "Content-Type", "value": "application/json"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"reservationId\": \"{{activeReservationId}}\",\n  \"outcomeSimulation\": \"APPROVE\",\n  \"idempotencyKey\": \"pay-idem-001\"\n}"
+        },
+        "url": "{{baseUrl}}/api/v1/payments/checkout"
+      }
+    },
+    {
+      "name": "14. Declined Payment Simulation",
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Authorization", "value": "Bearer {{attendeeToken}}"},
+          {"key": "Content-Type", "value": "application/json"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"reservationId\": \"{{activeReservationId2}}\",\n  \"outcomeSimulation\": \"DECLINE\",\n  \"idempotencyKey\": \"pay-idem-002\"\n}"
+        },
+        "url": "{{baseUrl}}/api/v1/payments/checkout"
+      }
+    },
+    {
+      "name": "15. Payment Timeout Simulation",
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Authorization", "value": "Bearer {{attendeeToken}}"},
+          {"key": "Content-Type", "value": "application/json"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"reservationId\": \"{{activeReservationId3}}\",\n  \"outcomeSimulation\": \"TIMEOUT\",\n  \"idempotencyKey\": \"pay-idem-003\"\n}"
+        },
+        "url": "{{baseUrl}}/api/v1/payments/checkout"
+      }
+    },
+    {
+      "name": "16. Duplicate Payment Callback / Idempotent Processing",
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Authorization", "value": "Bearer {{attendeeToken}}"},
+          {"key": "Content-Type", "value": "application/json"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"reservationId\": \"{{activeReservationId}}\",\n  \"outcomeSimulation\": \"APPROVE\",\n  \"idempotencyKey\": \"pay-idem-001\"\n}"
+        },
+        "url": "{{baseUrl}}/api/v1/payments/checkout"
+      }
+    },
+    {
+      "name": "17. Duplicate Ticket Issuance Prevention",
+      "request": {
+        "method": "GET",
+        "header": [{"key": "Authorization", "value": "Bearer {{attendeeToken}}"}],
+        "url": "{{baseUrl}}/api/v1/orders/{{confirmedOrderId}}"
+      }
+    },
+    {
+      "name": "18. Sales Cutoff Enforcement",
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Authorization", "value": "Bearer {{attendeeToken}}"},
+          {"key": "Content-Type", "value": "application/json"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"items\": [{\"ticketTierId\": \"{{cutoffPassedTierId}}\", \"quantity\": 1}]\n}"
+        },
+        "url": "{{baseUrl}}/api/v1/reservations"
+      }
+    },
+    {
+      "name": "19. Event Suspension (Admin Moderation)",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {"key": "Authorization", "value": "Bearer {{adminToken}}"},
+          {"key": "Content-Type", "value": "application/json"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"status\": \"SUSPENDED\", \"reason\": \"Violation of platform safety guidelines\"}"
+        },
+        "url": "{{baseUrl}}/api/v1/admin/events/{{targetEventId}}/status"
+      }
+    },
+    {
+      "name": "20. Organizer Analytics Authorization",
+      "request": {
+        "method": "GET",
+        "header": [{"key": "Authorization", "value": "Bearer {{organizerToken}}"}],
+        "url": "{{baseUrl}}/api/v1/organizer/analytics/overview"
+      }
+    },
+    {
+      "name": "21. Admin Authorization (Platform Audit Logs)",
+      "request": {
+        "method": "GET",
+        "header": [{"key": "Authorization", "value": "Bearer {{adminToken}}"}],
+        "url": "{{baseUrl}}/api/v1/admin/audit-logs"
+      }
+    },
+    {
+      "name": "22. Redis Failure Fallback Validation",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/v1/events?bypassCache=true"
+      }
+    },
+    {
+      "name": "23. Concurrent Reservation Simulation Trigger",
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Authorization", "value": "Bearer {{adminToken}}"},
+          {"key": "Content-Type", "value": "application/json"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"tierId\": \"{{testTierId}}\", \"concurrentRequests\": 50, \"requestedPerRequest\": 1}"
+        },
+        "url": "{{baseUrl}}/api/v1/admin/test-concurrency"
+      }
+    }
+  ]
+}

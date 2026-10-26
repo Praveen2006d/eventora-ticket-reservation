@@ -1,0 +1,130 @@
+erDiagram
+    User ||--o| OrganizerProfile : "has"
+    User ||--o{ Reservation : "creates"
+    User ||--o{ Order : "places"
+    User ||--o{ Ticket : "owns"
+    User ||--o{ RefreshToken : "owns"
+    User ||--o{ AuditLog : "initiates"
+
+    OrganizerProfile ||--o{ Event : "hosts"
+    Venue ||--o{ Event : "locates"
+
+    Event ||--|{ TicketTier : "offers"
+    Event ||--o{ Ticket : "admits"
+
+    Reservation ||--|{ ReservationItem : "contains"
+    Reservation ||--o| Order : "converted_to"
+    TicketTier ||--o{ ReservationItem : "allocated_in"
+
+    Order ||--|{ OrderItem : "contains"
+    Order ||--|{ PaymentTransaction : "processed_by"
+    TicketTier ||--o{ OrderItem : "sold_in"
+
+    OrderItem ||--|{ Ticket : "generates"
+
+    User {
+        string id PK
+        string name
+        string email UK
+        string passwordHash
+        string role "ADMIN | ORGANIZER | ATTENDEE"
+        string status "ACTIVE | SUSPENDED"
+        datetime createdAt
+    }
+
+    OrganizerProfile {
+        string id PK
+        string userId FK,UK
+        string organizationName
+        string verificationStatus "UNVERIFIED | PENDING | VERIFIED"
+    }
+
+    Venue {
+        string id PK
+        string name
+        string address
+        string city
+        string state
+        int capacity
+    }
+
+    Event {
+        string id PK
+        string organizerId FK
+        string venueId FK
+        string title
+        string slug UK
+        string category
+        datetime startAt
+        datetime endAt
+        datetime salesCutoffAt
+        string status "DRAFT | PUBLISHED | SUSPENDED"
+    }
+
+    TicketTier {
+        string id PK
+        string eventId FK
+        string name
+        int price "minor units (cents)"
+        int totalQuantity
+        int availableQuantity
+        int reservedQuantity
+        int soldQuantity
+        int maxPerOrder
+    }
+
+    Reservation {
+        string id PK
+        string attendeeId FK
+        string status "HELD | PAYMENT_PENDING | CONFIRMED | EXPIRED | RELEASED"
+        string idempotencyKey UK
+        datetime expiresAt "now + 10 mins"
+    }
+
+    ReservationItem {
+        string id PK
+        string reservationId FK
+        string ticketTierId FK
+        int quantity
+        int unitPrice
+    }
+
+    Order {
+        string id PK
+        string attendeeId FK
+        string reservationId FK
+        string orderNumber UK
+        int subtotal
+        int fees
+        int totalAmount
+        string status "PENDING | CONFIRMED | FAILED"
+    }
+
+    OrderItem {
+        string id PK
+        string orderId FK
+        string ticketTierId FK
+        int quantity
+        int unitPrice
+    }
+
+    PaymentTransaction {
+        string id PK
+        string orderId FK
+        string provider
+        string providerReference UK
+        int amount
+        string status "PENDING | APPROVED | DECLINED | TIMED_OUT"
+        string idempotencyKey UK
+    }
+
+    Ticket {
+        string id PK
+        string orderItemId FK
+        string attendeeId FK
+        string eventId FK
+        string ticketCode UK
+        string qrCodeData
+        string status "VALID | CHECKED_IN | CANCELLED"
+        datetime checkedInAt
+    }

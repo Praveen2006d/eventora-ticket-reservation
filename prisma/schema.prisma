@@ -1,0 +1,307 @@
+// Prisma Schema for Eventora: Multi-Tenant Event & Ticket Reservation System
+// Configured for PostgreSQL with high-concurrency reservation locking & auditing
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  ADMIN
+  ORGANIZER
+  ATTENDEE
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  PENDING_VERIFICATION
+}
+
+enum VerificationStatus {
+  UNVERIFIED
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum EventStatus {
+  DRAFT
+  PUBLISHED
+  SUSPENDED
+  CANCELLED
+  COMPLETED
+}
+
+enum ReservationStatus {
+  HELD
+  PAYMENT_PENDING
+  CONFIRMED
+  EXPIRED
+  RELEASED
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  FAILED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  APPROVED
+  DECLINED
+  TIMED_OUT
+  FAILED
+}
+
+enum TicketStatus {
+  VALID
+  CHECKED_IN
+  CANCELLED
+}
+
+model User {
+  id               String            @id @default(uuid())
+  name             String
+  email            String            @unique
+  passwordHash     String
+  role             Role              @default(ATTENDEE)
+  status           UserStatus        @default(ACTIVE)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  organizerProfile OrganizerProfile?
+  reservations     Reservation[]
+  orders           Order[]
+  tickets          Ticket[]
+  refreshTokens    RefreshToken[]
+  auditLogs        AuditLog[]        @relation("ActorAuditLogs")
+
+  @@index([email])
+  @@index([role, status])
+}
+
+model OrganizerProfile {
+  id                 String             @id @default(uuid())
+  userId             String             @unique
+  organizationName   String
+  description        String?
+  verificationStatus VerificationStatus @default(PENDING)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  events             Event[]
+
+  @@index([organizationName])
+}
+
+model Venue {
+  id        String   @id @default(uuid())
+  name      String
+  address   String
+  city      String
+  state     String
+  country   String   @default("United States")
+  capacity  Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  events    Event[]
+
+  @@index([city])
+}
+
+model Event {
+  id           String      @id @default(uuid())
+  organizerId  String
+  venueId      String
+  title        String
+  slug         String      @unique
+  description  String
+  category     String
+  posterUrl    String
+  startAt      DateTime
+  endAt        DateTime
+  salesStartAt DateTime
+  salesCutoffAt DateTime
+  status       EventStatus @default(DRAFT)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  organizer    OrganizerProfile @relation(fields: [organizerId], references: [id], onDelete: Restrict)
+  venue        Venue            @relation(fields: [venueId], references: [id], onDelete: Restrict)
+  ticketTiers  TicketTier[]
+  tickets      Ticket[]
+
+  @@index([status, startAt])
+  @@index([category])
+  @@index([organizerId])
+}
+
+model TicketTier {
+  id                String            @id @default(uuid())
+  eventId           String
+  name              String
+  description       String?
+  price             Int               // Monetary amounts stored as minor units (e.g. cents/paise)
+  currency          String            @default("USD")
+  totalQuantity     Int
+  availableQuantity Int
+  reservedQuantity  Int               @default(0)
+  soldQuantity      Int               @default(0)
+  salesStartAt      DateTime?
+  salesEndAt        DateTime?
+  maxPerOrder       Int               @default(6)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  event             Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  reservationItems  ReservationItem[]
+  orderItems        OrderItem[]
+
+  @@index([eventId])
+}
+
+model Reservation {
+  id             String            @id @default(uuid())
+  attendeeId     String
+  status         ReservationStatus @default(HELD)
+  idempotencyKey String?           @unique
+  expiresAt      DateTime
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  attendee       User              @relation(fields: [attendeeId], references: [id], onDelete: Cascade)
+  items          ReservationItem[]
+  orders         Order[]
+
+  @@index([attendeeId])
+  @@index([status, expiresAt])
+}
+
+model ReservationItem {
+  id            String      @id @default(uuid())
+  reservationId String
+  ticketTierId  String
+  quantity      Int
+  unitPrice     Int
+
+  reservation   Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  ticketTier    TicketTier  @relation(fields: [ticketTierId], references: [id], onDelete: Restrict)
+
+  @@index([reservationId])
+  @@index([ticketTierId])
+}
+
+model Order {
+  id             String               @id @default(uuid())
+  attendeeId     String
+  reservationId  String?
+  orderNumber    String               @unique
+  subtotal       Int                  // minor units
+  fees           Int                  // minor units
+  totalAmount    Int                  // minor units
+  currency       String               @default("USD")
+  status         OrderStatus          @default(PENDING)
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  attendee       User                 @relation(fields: [attendeeId], references: [id], onDelete: Restrict)
+  reservation    Reservation?         @relation(fields: [reservationId], references: [id], onDelete: SetNull)
+  items          OrderItem[]
+  transactions   PaymentTransaction[]
+
+  @@index([attendeeId])
+  @@index([status, createdAt])
+}
+
+model OrderItem {
+  id           String      @id @default(uuid())
+  orderId      String
+  ticketTierId String
+  quantity     Int
+  unitPrice    Int
+
+  order        Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  ticketTier   TicketTier  @relation(fields: [ticketTierId], references: [id], onDelete: Restrict)
+  tickets      Ticket[]
+
+  @@index([orderId])
+  @@index([ticketTierId])
+}
+
+model PaymentTransaction {
+  id                String        @id @default(uuid())
+  orderId           String
+  provider          String        @default("EVENTORA_MOCK_GATEWAY")
+  providerReference String?       @unique
+  amount            Int
+  currency          String        @default("USD")
+  status            PaymentStatus @default(PENDING)
+  idempotencyKey    String        @unique
+  failureReason     String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  order             Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([status])
+}
+
+model Ticket {
+  id          String       @id @default(uuid())
+  orderItemId String
+  attendeeId  String
+  eventId     String
+  ticketCode  String       @unique
+  qrCodeData  String
+  status      TicketStatus @default(VALID)
+  issuedAt    DateTime     @default(now())
+  checkedInAt DateTime?
+
+  orderItem   OrderItem    @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  attendee    User         @relation(fields: [attendeeId], references: [id], onDelete: Restrict)
+  event       Event        @relation(fields: [eventId], references: [id], onDelete: Restrict)
+
+  @@index([attendeeId])
+  @@index([eventId])
+  @@index([ticketCode])
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String?
+  action     String
+  entityType String
+  entityId   String
+  metadata   String?  // JSON string
+  createdAt  DateTime @default(now())
+
+  actor      User?    @relation("ActorAuditLogs", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([action, createdAt])
+  @@index([entityType, entityId])
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Eventora — Multi-Tenant Event & Ticket Reservation System",
+  "description": "High-concurrency multi-tenant event management and ticket reservation platform with atomic row-level locking, 10-minute inventory holds, asynchronous payment simulation, and QR ticket issuance.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
